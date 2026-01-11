@@ -60,6 +60,7 @@ body{
   margin-bottom:8px;
   cursor:pointer;
   transition:all .25s ease;
+  position:relative;
 }
 .time-row:hover{
   transform:scale(1.01);
@@ -69,6 +70,22 @@ body{
   color:white;
   pointer-events:none;
   animation:pop .25s ease;
+}
+
+/* Time hover 24->12 format */
+.time-row span{
+  transition:all .2s ease;
+}
+
+.time-row span::after{
+  content: attr(data-hover);
+  position: absolute;
+  right:14px;
+  opacity:0;
+  transition:opacity .2s ease;
+}
+.time-row:hover span::after{
+  opacity:1;
 }
 
 /* Animations */
@@ -105,9 +122,7 @@ body{
   <div id="header" class="flex justify-between items-center mb-4">
     <div class="text-lg font-bold tracking-wide">TikTok Automation</div>
     <button id="resetBtn"
-      class="text-lg bg-gray-200 hover:bg-gray-300 transition px-3 py-1 rounded-full">
-      ↺
-    </button>
+      class="text-lg bg-gray-200 hover:bg-gray-300 transition px-3 py-1 rounded-full">↺</button>
   </div>
 
   <!-- BACK ICON -->
@@ -123,14 +138,15 @@ body{
 // ================= CONFIG =================
 const today = "2026-11-01";
 
+// Original topics per account
 const accountsData = [
-  { name:"Priya", topic:"Candy_0999 (Insta)", times:["15:45","19:45","22:45"] },
-  { name:"Muskan Khan", topic:"Random Edit Clips", times:["16:00","20:00","22:30"] },
-  { name:"Maya Ali", topic:"Random Edit Clips", times:["16:15","20:15","22:45"] },
-  { name:"Sarah Khan", topic:"Sanrita Videos Edit", times:["16:30","20:30","23:00"] },
-  { name:"Dur-e-Fishan", topic:"Random Edit Clips", times:["16:45","20:45","23:15"] },
-  { name:"Aisha", topic:"Prapit (Insta)", times:["17:00","21:00","23:30"] },
-  { name:"Aalina Batool", topic:"Sanorita Videos Edit", times:["17:15","21:15","23:45"] }
+  { name:"Priya", topic:"Candy_0999 (Insta)", times:["15:45","19:45"], videos:2 },
+  { name:"Muskan Khan", topic:"Random Edit Clips", times:["16:00","20:00","22:30"], videos:3 },
+  { name:"Maya Ali", topic:"Random Edit Clips", times:["16:15","18:30","20:15","22:45"], videos:4 },
+  { name:"Sarah Khan", topic:"Sanrita Videos Edit", times:["16:30","18:45","20:30","23:00"], videos:4 },
+  { name:"Dur-e-Fishan", topic:"Random Edit Clips", times:["16:45","20:45"], videos:2 },
+  { name:"Aisha", topic:"Prapit (Insta)", times:["17:00","21:00"], videos:2 },
+  { name:"Aalia Batool", topic:"Sanorita Videos Edit", times:["17:15","18:45","21:15","23:45"], videos:4 }
 ];
 
 const accountNames = accountsData.map(a=>a.name);
@@ -158,6 +174,14 @@ resetBtn.onclick=()=>{
   save();
   renderDates();
 };
+
+// ================= HELPER 24H -> 12H =================
+function to12Hour(t){
+  let [h,m]=t.split(":").map(Number);
+  let suffix=h>=12?"PM":"AM";
+  h=h%12||12;
+  return `${h}:${m.toString().padStart(2,'0')} ${suffix}`;
+}
 
 // ================= RENDER DATES =================
 function renderDates(){
@@ -239,9 +263,9 @@ function renderTimes(acc){
   timesPage.innerHTML="";
 
   store[currentDate][acc.name] ||= {
-    topic:acc.topic,
-    times:acc.times,
-    status:[false,false,false],
+    topic: acc.topic,
+    times: acc.times,
+    status:Array(acc.times.length).fill(false),
     done:false
   };
 
@@ -255,8 +279,14 @@ function renderTimes(acc){
 
   data.times.forEach((t,i)=>{
     let row=document.createElement("div");
-    row.className="time-row";
-    row.innerText=`Time: ${t}`;
+    row.className="time-row clickable";
+
+    // 24h span, hover shows 12h
+    let span=document.createElement("span");
+    span.innerText=t;
+    span.setAttribute("data-hover",to12Hour(t));
+    row.appendChild(span);
+
     if(data.status[i]) row.classList.add("done");
 
     row.onclick=()=>{
