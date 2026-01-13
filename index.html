@@ -8,91 +8,92 @@
 
 <style>
 :root{
-  --bg:#f8fafc;
-  --card:#ffffff;
-  --text:#111827;
-  --muted:#6b7280;
-
-  --green:#22c55e;
+  --green:#34d399;
   --red:#ef4444;
-  --blue:#3b82f6;
   --gray:#e5e7eb;
 }
 
-/* Dark mode variables */
-body.dark{
-  --bg:#0f172a;
-  --card:#1e293b;
-  --text:#e5e7eb;
-  --muted:#94a3b8;
-  --gray:#334155;
-}
-
 body{
-  background:var(--bg);
-  color:var(--text);
+  background:linear-gradient(180deg,#f9fafb,#f3f4f6);
   font-family:system-ui,-apple-system,BlinkMacSystemFont;
-  transition:background .3s,color .3s;
 }
 
-/* Cards */
+/* Card base */
 .card{
-  background:var(--card);
-  border-radius:18px;
-  padding:16px;
-  margin-bottom:14px;
-  box-shadow:0 8px 18px rgba(0,0,0,.08);
+  background:white;
+  border-radius:16px;
+  padding:14px;
+  margin-bottom:12px;
+  box-shadow:0 6px 14px rgba(0,0,0,.08);
   transition:all .25s ease;
 }
+
+/* Hover / tap feedback */
 .card.clickable:hover{
-  transform:translateY(-3px) scale(1.01);
+  transform:translateY(-2px) scale(1.01);
+  box-shadow:0 10px 22px rgba(0,0,0,.12);
 }
-.card:active{transform:scale(.97)}
+.card.clickable:active{
+  transform:scale(.97);
+}
 
 /* States */
-.done{background:var(--green);color:white}
-.failed{background:var(--red);color:white}
-.disabled{opacity:.45;pointer-events:none}
+.done{
+  background:var(--green)!important;
+  color:white;
+  animation:pop .3s ease;
+}
+.failed{
+  background:var(--red)!important;
+  color:white;
+}
+.disabled{
+  opacity:.45;
+  pointer-events:none;
+}
 
 /* Time rows */
-.time{
+.time-row{
   background:var(--gray);
-  padding:16px;
-  border-radius:16px;
-  margin-bottom:10px;
+  border-radius:14px;
+  padding:14px;
+  margin-bottom:8px;
   cursor:pointer;
-  transition:.25s;
+  transition:all .25s ease;
 }
-.time:hover{transform:scale(1.02)}
-.time.done{
+.time-row:hover{
+  transform:scale(1.01);
+}
+.time-row.done{
   background:var(--green);
   color:white;
   pointer-events:none;
-}
-.time.next{
-  background:var(--blue);
-  color:white;
-  animation:pulse 1.5s infinite;
+  animation:pop .25s ease;
 }
 
-@keyframes pulse{
-  0%{box-shadow:0 0 0 0 rgba(59,130,246,.5)}
-  70%{box-shadow:0 0 0 14px rgba(59,130,246,0)}
-  100%{box-shadow:0 0 0 0 rgba(59,130,246,0)}
+/* Animations */
+@keyframes pop{
+  0%{transform:scale(.95)}
+  100%{transform:scale(1)}
 }
 
 /* Header */
 #header{
   position:sticky;
   top:0;
-  z-index:20;
-  background:var(--bg);
-  padding-bottom:8px;
+  z-index:10;
+  background:rgba(249,250,251,.9);
+  backdrop-filter:blur(6px);
+  padding-bottom:6px;
 }
 
 /* Responsive */
-@media (min-width:768px){.container{max-width:600px}}
-@media (min-width:1024px){.container{max-width:720px}}
+@media (min-width:768px){
+  .container{max-width:640px}
+}
+@media (min-width:1024px){
+  .container{max-width:720px}
+}
 </style>
 </head>
 
@@ -100,197 +101,181 @@ body{
 
 <div class="container mx-auto p-4">
 
-<!-- MAIN HEADER -->
-<div id="header" class="flex justify-between items-center mb-4">
-  <div class="font-bold text-lg tracking-wide">TikTok Automation</div>
-  <div class="flex gap-2">
-    <button id="themeBtn" class="px-3 py-1 rounded-full bg-gray-200 dark:bg-slate-700">
-      🌙
-    </button>
-    <button id="resetBtn" class="px-3 py-1 rounded-full bg-gray-200 dark:bg-slate-700">
+  <!-- HEADER (MAIN PAGE ONLY) -->
+  <div id="header" class="flex justify-between items-center mb-4">
+    <div class="text-lg font-bold tracking-wide">TikTok Automation</div>
+    <button id="resetBtn"
+      class="text-lg bg-gray-200 hover:bg-gray-300 transition px-3 py-1 rounded-full">
       ↺
     </button>
   </div>
-</div>
 
-<!-- BACK ICON -->
-<div id="backBtn" class="hidden text-2xl mb-3 cursor-pointer select-none">←</div>
+  <!-- BACK ICON -->
+  <div id="backBtn" class="hidden mb-3 text-2xl cursor-pointer select-none">←</div>
 
-<div id="dates"></div>
-<div id="accounts" class="hidden"></div>
-<div id="times" class="hidden"></div>
+  <div id="datesPage"></div>
+  <div id="accountsPage" class="hidden"></div>
+  <div id="timesPage" class="hidden"></div>
 
 </div>
 
 <script>
-// ===== THEME =====
-const themeBtn=document.getElementById("themeBtn");
-const savedTheme=localStorage.getItem("theme");
-if(savedTheme==="dark"){
-  document.body.classList.add("dark");
-  themeBtn.textContent="☀️";
-}
+// ================= CONFIG =================
+const today = "2026-11-01";
 
-themeBtn.onclick=()=>{
-  document.body.classList.toggle("dark");
-  const isDark=document.body.classList.contains("dark");
-  themeBtn.textContent=isDark?"☀️":"🌙";
-  localStorage.setItem("theme",isDark?"dark":"light");
-};
-
-// ===== DATE =====
-const today=new Date().toISOString().split("T")[0];
-const nowMinutes=new Date().getHours()*60+new Date().getMinutes();
-
-// ===== DATA =====
-const accounts=[
- {name:"Priya",topic:"Candy_0999 (Insta)",times:["15:45","19:45"]},
- {name:"Muskan Khan",topic:"Random Edit Clips",times:["16:00","20:00","22:30"]},
- {name:"Maya Ali",topic:"Random Edit Clips",times:["16:15","18:30","20:15","22:45"]},
- {name:"Sarah Khan",topic:"Sanrita Videos Edit",times:["16:30","18:45","20:30","23:00"]},
- {name:"Dur-e-Fishan",topic:"Random Edit Clips",times:["16:45","20:45"]},
- {name:"Aisha",topic:"Prapit (Insta)",times:["17:00","21:00"]},
- {name:"Aalia Batool",topic:"Sanorita Videos Edit",times:["17:15","18:45","21:15","23:45"]}
+const accountsData = [
+  { name:"Priya", topic:"Candy_0999 (Insta)", times:["15:45","19:45","22:45"] },
+  { name:"Muskan Khan", topic:"Random Edit Clips", times:["16:00","20:00","22:30"] },
+  { name:"Maya Ali", topic:"Random Edit Clips", times:["16:15","20:15","22:45"] },
+  { name:"Sarah Khan", topic:"Sanrita Videos Edit", times:["16:30","20:30","23:00"] },
+  { name:"Dur-e-Fishan", topic:"Random Edit Clips", times:["16:45","20:45","23:15"] },
+  { name:"Aisha", topic:"Prapit (Insta)", times:["17:00","21:00","23:30"] },
+  { name:"Aalina Batool", topic:"Sanorita Videos Edit", times:["17:15","21:15","23:45"] }
 ];
 
-// ===== STORAGE =====
-let store=JSON.parse(localStorage.getItem("tt_auto"))||{};
-const save=()=>localStorage.setItem("tt_auto",JSON.stringify(store));
+const accountNames = accountsData.map(a=>a.name);
 
-// ===== ELEMENTS =====
-const datesDiv=document.getElementById("dates");
-const accDiv=document.getElementById("accounts");
-const timeDiv=document.getElementById("times");
-const backBtn=document.getElementById("backBtn");
-const resetBtn=document.getElementById("resetBtn");
-const header=document.getElementById("header");
+// ================= STORAGE =================
+let store = JSON.parse(localStorage.getItem("automation")) || {};
+const save = ()=>localStorage.setItem("automation",JSON.stringify(store));
 
-// ===== RESET =====
+// ================= ELEMENTS =================
+const datesPage = document.getElementById("datesPage");
+const accountsPage = document.getElementById("accountsPage");
+const timesPage = document.getElementById("timesPage");
+const backBtn = document.getElementById("backBtn");
+const resetBtn = document.getElementById("resetBtn");
+const header = document.getElementById("header");
+
+let currentDate="";
+
+// ================= RESET =================
 resetBtn.onclick=()=>{
-  const d=prompt("Enter date (YYYY-MM-DD)");
-  if(prompt("Password")!=="mopi") return;
-  delete store[d];
-  save(); renderDates();
+  const date=prompt("Enter date (YYYY-MM-DD)");
+  if(!date) return;
+  if(prompt("Password")!=="mopi") return alert("Wrong password");
+  delete store[date];
+  save();
+  renderDates();
 };
 
-// ===== DATES =====
+// ================= RENDER DATES =================
 function renderDates(){
   header.classList.remove("hidden");
-  themeBtn.classList.remove("hidden");
   backBtn.classList.add("hidden");
 
-  datesDiv.innerHTML="";
-  accDiv.classList.add("hidden");
-  timeDiv.classList.add("hidden");
+  datesPage.innerHTML="";
+  datesPage.classList.remove("hidden");
+  accountsPage.classList.add("hidden");
+  timesPage.classList.add("hidden");
 
   for(let i=0;i<60;i++){
-    let d=new Date();
+    let d=new Date(today);
     d.setDate(d.getDate()+i);
-    let ds=d.toISOString().split("T")[0];
+    let dateStr=d.toISOString().split("T")[0];
 
-    let card=document.createElement("div");
-    card.className="card text-center";
-    card.innerText=ds;
+    let div=document.createElement("div");
+    div.className="card text-center";
+    div.innerText=dateStr;
 
-    const data=store[ds];
-    const past=ds<today;
+    const data=store[dateStr];
+    const isPast=dateStr<today;
 
     if(data){
-      const allDone=accounts.every(a=>data[a.name]?.done);
-      if(allDone) card.classList.add("done");
-      else if(past) card.classList.add("failed");
+      const allDone=accountNames.every(a=>data[a]?.done);
+      if(allDone){
+        div.classList.add("done");
+        div.innerText+="\nAll tasks done";
+      }else if(isPast){
+        div.classList.add("failed");
+        div.innerText+="\nTasks incomplete";
+      }
     }
 
-    if(ds===today){
-      card.classList.add("clickable");
-      card.onclick=()=>renderAccounts(ds);
+    if(dateStr===today){
+      div.classList.add("clickable");
+      div.onclick=()=>renderAccounts(dateStr);
     }else{
-      card.classList.add("disabled");
+      div.classList.add("disabled");
     }
-    datesDiv.appendChild(card);
+
+    datesPage.appendChild(div);
   }
 }
 
-// ===== ACCOUNTS =====
+// ================= RENDER ACCOUNTS =================
 function renderAccounts(date){
+  currentDate=date;
   header.classList.add("hidden");
   backBtn.classList.remove("hidden");
   backBtn.onclick=renderDates;
 
-  datesDiv.innerHTML="";
-  accDiv.innerHTML="";
-  accDiv.classList.remove("hidden");
-  timeDiv.classList.add("hidden");
+  datesPage.classList.add("hidden");
+  accountsPage.classList.remove("hidden");
+  timesPage.classList.add("hidden");
+  accountsPage.innerHTML="";
 
   store[date] ||= {};
 
-  accounts.forEach(a=>{
-    let c=document.createElement("div");
-    c.className="card clickable";
-    c.innerText=a.name;
+  accountsData.forEach(acc=>{
+    let div=document.createElement("div");
+    div.className="card clickable";
+    div.innerText=acc.name;
 
-    if(store[date][a.name]?.done){
-      c.classList.add("done","disabled");
+    if(store[date][acc.name]?.done){
+      div.classList.add("done","disabled");
     }else{
-      c.onclick=()=>renderTimes(date,a);
+      div.onclick=()=>renderTimes(acc);
     }
-    accDiv.appendChild(c);
+    accountsPage.appendChild(div);
   });
 }
 
-// ===== TIMES =====
-function renderTimes(date,acc){
-  accDiv.classList.add("hidden");
-  timeDiv.classList.remove("hidden");
-  backBtn.onclick=()=>renderAccounts(date);
-  timeDiv.innerHTML="";
+// ================= RENDER TIMES =================
+function renderTimes(acc){
+  backBtn.onclick=()=>renderAccounts(currentDate);
+  accountsPage.classList.add("hidden");
+  timesPage.classList.remove("hidden");
+  timesPage.innerHTML="";
 
-  store[date][acc.name] ||= {
-    status:Array(acc.times.length).fill(false),
+  store[currentDate][acc.name] ||= {
+    topic:acc.topic,
+    times:acc.times,
+    status:[false,false,false],
     done:false
   };
 
-  timeDiv.innerHTML=`
+  const data=store[currentDate][acc.name];
+
+  timesPage.innerHTML=`
     <div class="card text-center font-semibold">
       ${acc.name}<br>
-      <span class="text-sm opacity-70">${acc.topic}</span>
-    </div>
-  `;
+      <span class="text-sm opacity-70">${data.topic}</span>
+    </div>`;
 
-  let nextIndex=-1;
-  if(date===today){
-    acc.times.forEach((t,i)=>{
-      let [h,m]=t.split(":").map(Number);
-      if(h*60+m>nowMinutes && nextIndex===-1){
-        nextIndex=i;
-      }
-    });
-  }
-
-  acc.times.forEach((t,i)=>{
+  data.times.forEach((t,i)=>{
     let row=document.createElement("div");
-    row.className="time";
-    row.innerText=t;
-
-    if(store[date][acc.name].status[i]){
-      row.classList.add("done");
-    }else if(i===nextIndex){
-      row.classList.add("next");
-    }
+    row.className="time-row";
+    row.innerText=`Time: ${t}`;
+    if(data.status[i]) row.classList.add("done");
 
     row.onclick=()=>{
-      store[date][acc.name].status[i]=true;
-      if(store[date][acc.name].status.every(v=>v)){
-        store[date][acc.name].done=true;
-        save(); renderAccounts(date);
+      if(data.status[i]) return;
+      data.status[i]=true;
+      if(data.status.every(v=>v)){
+        data.done=true;
+        save();
+        renderAccounts(currentDate);
       }else{
-        save(); renderTimes(date,acc);
+        save();
+        renderTimes(acc);
       }
     };
-    timeDiv.appendChild(row);
+    timesPage.appendChild(row);
   });
 }
 
+// ================= INIT =================
 renderDates();
 </script>
 
